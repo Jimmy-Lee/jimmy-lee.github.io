@@ -63,3 +63,9 @@ a.theme:hover, a.theme:active {
 article > p {
     line-height: 1.5;
 }
+
+.icon {
+    width: 1em;
+    height: 1em;
+    margin-right: 4pt;
+}
