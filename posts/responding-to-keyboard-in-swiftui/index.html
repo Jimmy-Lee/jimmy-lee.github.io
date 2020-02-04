@@ -1,0 +1,57 @@
+<!DOCTYPE html><html lang="tw"><head><meta charset="UTF-8"/><meta name="og:site_name" content="李昇輯"/><link rel="canonical" href="http://localhost:8000/posts/responding-to-keyboard-in-swiftui"/><meta name="twitter:url" content="http://localhost:8000/posts/responding-to-keyboard-in-swiftui"/><meta name="og:url" content="http://localhost:8000/posts/responding-to-keyboard-in-swiftui"/><title>Responding to Keyboard in SwiftUI | 李昇輯</title><meta name="twitter:title" content="Responding to Keyboard in SwiftUI | 李昇輯"/><meta name="og:title" content="Responding to Keyboard in SwiftUI | 李昇輯"/><meta name="description" content="Responding to keyboard in SwiftUI."/><meta name="twitter:description" content="Responding to keyboard in SwiftUI."/><meta name="og:description" content="Responding to keyboard in SwiftUI."/><meta name="twitter:card" content="summary"/><link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/base-min.css" type="text/css"/><link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/grids-responsive-min.css" type="text/css"/><link rel="stylesheet" href="/styles.css" type="text/css"/><link rel="stylesheet" href="/syntax.css" type="text/css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><link rel="shortcut icon" href="/images/favicon.png" type="image/png"/><link rel="alternate" href="/feed.rss" type="application/rss+xml" title="Subscribe to 李昇輯"/></head><body><div class="pure-g"><div class="sidebar pure-u-1 pure-u-md-1-5"><h1><a class="theme" href="/">李昇輯</a></h1><h2>iOS Developer</h2><p>Taipei, Taiwan</p><p><a class="theme" href="https://github.com/Jimmy-Lee">github</a></p><p><a class="theme" href="https://www.linkedin.com/in/%E6%98%87%E8%BC%AF-%E6%9D%8E-8a5340112/">linkedin</a></p><p><a class="theme" href="https://twitter.com/jimmy_prime">twitter</a></p><p><a class="theme" href="mailto:jimmylevelup@gmail.com">email</a></p></div><div class="content pure-u-1 pure-u-md-3-5"><h1>Responding to Keyboard in SwiftUI</h1><tag><a href="/tags/swiftui">SwiftUI</a></tag><tag><a href="/tags/keyboard">keyboard</a></tag><p class="date">2019-11-27</p><article><p>Dealing with keyboards is always so hard in iOS development. In UIKit programming, we have to deal with AutoLayout, Notifications, Animation, and lots of other stuff. This post will introduce a cleaner way to handle keyboards in SwiftUI.</p><p>Let's say we have a view with input fields:</p><pre><code><span class="keyword">struct</span> SomeViewWithInputFields: <span class="type">View</span> {
+    <span class="keyword">var</span> body: <span class="keyword">some</span> <span class="type">View</span> {
+        ...
+    }
+}
+</code></pre><p>When keyboard is shown, we want to append a Spacer below our content with the size of keyboard. We can start by inplementing a <code>KeyboardObserver</code> that handles keyboard notifications and propagates notification values.</p><pre><code><span class="keyword">class</span> KeyboardObserver: <span class="type">ObservableObject</span> {
+    <span class="keyword">struct</span> KeyboardProperty {
+        <span class="keyword">let</span> height: <span class="type">CGFloat</span>
+        <span class="keyword">let</span> duration: <span class="type">Double</span>
+
+        <span class="keyword">static var</span> none: <span class="type">Self</span> { .<span class="keyword">init</span>(height: <span class="number">0</span>, duration: <span class="number">0</span>) }
+    }
+
+    <span class="keyword">@Published var</span> dockedKeyboardProperty = <span class="type">KeyboardProperty</span>.<span class="property">none</span>
+
+    <span class="keyword">private var</span> willChangeFrame: <span class="type">AnyCancellable</span>?
+
+    <span class="keyword">init</span>() {
+        willChangeFrame = <span class="type">NotificationCenter</span>.<span class="type">Publisher</span>(center: .<span class="dotAccess">default</span>, name: <span class="type">UIResponder</span>.<span class="property">keyboardWillChangeFrameNotification</span>)
+            .<span class="call">map</span> {
+                <span class="keyword">guard let</span> userInfo = $0.<span class="property">userInfo</span>,
+                    <span class="keyword">let</span> duration = userInfo[<span class="type">UIResponder</span>.<span class="property">keyboardAnimationDurationUserInfoKey</span>] <span class="keyword">as</span>? <span class="type">Double</span>,
+                    <span class="keyword">let</span> rect = userInfo[<span class="type">UIResponder</span>.<span class="property">keyboardFrameEndUserInfoKey</span>] <span class="keyword">as</span>? <span class="type">CGRect</span> <span class="keyword">else</span> {
+                    <span class="keyword">return</span> .<span class="dotAccess">none</span>
+                }
+
+                <span class="keyword">if</span> rect.<span class="property">maxY</span> == <span class="type">UIScreen</span>.<span class="property">main</span>.<span class="property">bounds</span>.<span class="property">height</span> { <span class="comment">// 1</span>
+                    <span class="keyword">return</span> .<span class="keyword">init</span>(height: rect.<span class="property">height</span>, duration: duration)
+                } <span class="keyword">else</span> {
+                    <span class="keyword">return</span> .<span class="keyword">init</span>(height: <span class="number">0</span>, duration: duration)
+                }
+            }
+            .<span class="call">assign</span>(to: \.<span class="property">dockedKeyboardProperty</span>, on: <span class="keyword">self</span>)
+    }
+
+    <span class="keyword">deinit</span> {
+        willChangeFrame?.<span class="call">cancel</span>()
+    }
+}
+</code></pre><p>Notice at (1), we only handle docked keyboard, because when keyboard is floating, user can move the keyboard around, and we should not pad our content.</p><p>Instead of directly use <code>KeyboardObserver</code>, we can wrap Spacer and logic and <code>KeyboardObserver</code> into another View.</p><pre><code><span class="keyword">struct</span> KeyboardSpacer: <span class="type">View</span> {
+    <span class="keyword">@EnvironmentObject var</span> keyboardObserver: <span class="type">KeyboardObserver</span>
+
+    <span class="keyword">var</span> body: <span class="keyword">some</span> <span class="type">View</span> {
+        <span class="type">Spacer</span>()
+            .<span class="call">frame</span>(height: keyboardObserver.<span class="property">dockedKeyboardProperty</span>.<span class="property">height</span>)
+            .<span class="call">animation</span>(.<span class="call">easeInOut</span>(duration: keyboardObserver.<span class="property">dockedKeyboardProperty</span>.<span class="property">duration</span>))
+    }
+}
+</code></pre><p>Now we can modify our view, wrap original content and <code>KeyboardSpacer</code> into <code>VStack</code></p><pre><code><span class="keyword">struct</span> SomeViewWithInput: <span class="type">View</span> {
+    <span class="keyword">var</span> body: <span class="keyword">some</span> <span class="type">View</span> {
+        <span class="type">VStack</span> {
+            ...
+            <span class="type">KeyboardSpacer</span>()
+        }
+    }
+}
+</code></pre><p>Finally, just remember to <code>.environmentObject(KeyboardObserver())</code> some where in the view tree.</p></article></div><footer><p>Generated using <a href="https://github.com/johnsundell/publish">Publish</a></p><p><a href="/feed.rss">RSS feed</a></p></footer></div></body></html>

@@ -1,0 +1,26 @@
+<!DOCTYPE html><html lang="tw"><head><meta charset="UTF-8"/><meta name="og:site_name" content="李昇輯"/><link rel="canonical" href="http://localhost:8000/posts/property-wrapper-tricks"/><meta name="twitter:url" content="http://localhost:8000/posts/property-wrapper-tricks"/><meta name="og:url" content="http://localhost:8000/posts/property-wrapper-tricks"/><title>Property Wrapper Tricks | 李昇輯</title><meta name="twitter:title" content="Property Wrapper Tricks | 李昇輯"/><meta name="og:title" content="Property Wrapper Tricks | 李昇輯"/><meta name="description" content="Property wrapper tricks."/><meta name="twitter:description" content="Property wrapper tricks."/><meta name="og:description" content="Property wrapper tricks."/><meta name="twitter:card" content="summary"/><link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/base-min.css" type="text/css"/><link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/grids-responsive-min.css" type="text/css"/><link rel="stylesheet" href="/styles.css" type="text/css"/><link rel="stylesheet" href="/syntax.css" type="text/css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><link rel="shortcut icon" href="/images/favicon.png" type="image/png"/><link rel="alternate" href="/feed.rss" type="application/rss+xml" title="Subscribe to 李昇輯"/></head><body><div class="pure-g"><div class="sidebar pure-u-1 pure-u-md-1-5"><h1><a class="theme" href="/">李昇輯</a></h1><h2>iOS Developer</h2><p>Taipei, Taiwan</p><p><a class="theme" href="https://github.com/Jimmy-Lee">github</a></p><p><a class="theme" href="https://www.linkedin.com/in/%E6%98%87%E8%BC%AF-%E6%9D%8E-8a5340112/">linkedin</a></p><p><a class="theme" href="https://twitter.com/jimmy_prime">twitter</a></p><p><a class="theme" href="mailto:jimmylevelup@gmail.com">email</a></p></div><div class="content pure-u-1 pure-u-md-3-5"><h1>Property Wrapper Tricks</h1><tag><a href="/tags/property-wrapper">property wrapper</a></tag><p class="date">2019-11-20</p><article><p>最近 app 想要支援多帳號登入，很多資料需要重新規劃儲存方式。其中想分享的是存在 UserDefaults 的資料要怎麼重新定義才不需要改太多程式碼。</p><p>假設我們正在做聊天軟體，有一個使用者設定是要不要上傳原始品質的圖片，如果是連到公司站，就保留原始品質；如果連到自己的伺服器，就壓縮再上傳避免把硬碟塞爆。現在這個 Bool 設定直接存在 UserDefaults (這裡用到的 @UserDefault 和 <a href="https://github.com/apple/swift-evolution/blob/master/proposals/0258-property-wrappers.md#user-defaults">SE-0258 Property Wrapper</a> 裡面舉的例子是一樣的，有興趣的話可以點進去看 proposal)</p><pre><code><span class="keyword">enum</span> UserSettings {
+    <span class="keyword">@UserDefault</span>(key: <span class="string">"preserve_image_quality"</span>, defaultValue: <span class="keyword">false</span>)
+    <span class="keyword">static var</span> preserveImageQuality: <span class="type">Bool</span>
+}
+</code></pre><p>現在這個 Bool 每個登入的帳號都必須存一個，如果又想要保留 UserSettings.preserveImageQuality 的呼叫方式要怎麼做呢？</p><p>因為 UserDefaults 是一個 key/value pair 的結構，只要我可以幫每個使用者產生出獨一無二的 key，我就可以把這些東西全部存到 UserDefaults 裡面了。我們可以把使用者的識別碼串到 key 裡面</p><pre><code><span class="string">"</span>\(<span class="type">Defaults</span>.<span class="property">currentAccount</span>.<span class="property">id</span>)<span class="string">_preserve_image_quality"</span> <span class="comment">// 新的 key</span>
+</code></pre><p>這個新的 key pattern 可能需要用在很多 UserSettings 裡面，我們一樣用 Property Wrapper 來避免重複 boilerplate code</p><pre><code><span class="keyword">@propertyWrapper
+struct</span> AccountDefault&lt;T&gt; {
+    <span class="keyword">let</span> key: <span class="type">String</span>
+    <span class="keyword">let</span> defaultValue: <span class="type">T</span>
+    <span class="keyword">private var</span> defaultsKey: <span class="type">String</span> {
+        <span class="string">"</span>\(<span class="type">Defaults</span>.<span class="property">currentAccount</span>.<span class="property">id</span>)<span class="string">_</span>\(key)<span class="string">"</span>
+    }
+    <span class="keyword">var</span> wrappedValue: <span class="type">T</span> {
+        <span class="keyword">get</span> {
+            <span class="type">UserDefaults</span>.<span class="property">standard</span>.<span class="call">object</span>(forKey: defaultsKey) <span class="keyword">as</span>? <span class="type">T</span> ?? defaultValue
+        }
+        <span class="keyword">set</span> {
+            <span class="type">UserDefaults</span>.<span class="property">standard</span>.<span class="call">set</span>(newValue, forKey: defaultsKey)
+        }
+    }
+}
+</code></pre><p>利用一個 computed property defaultsKey 讓每次 get/set 拿到的 key 都是目前的登入帳號串成的。現在 UserSettings 裡面就可以用 AccountDefault 改寫了。</p><pre><code><span class="keyword">enum</span> UserSettings {
+    <span class="keyword">@AccountDefault</span>(key: <span class="string">"preserve_image_quality"</span>, defaultValue: <span class="keyword">false</span>)
+    <span class="keyword">static var</span> preserveImageQuality: <span class="type">Bool</span>
+}
+</code></pre><p>唯一改動的地方就是把 UserDefault 改成 AccountDefault。</p></article></div><footer><p>Generated using <a href="https://github.com/johnsundell/publish">Publish</a></p><p><a href="/feed.rss">RSS feed</a></p></footer></div></body></html>
