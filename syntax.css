@@ -1,12 +1,12 @@
 pre {
     margin-bottom: 1.5em;
-    background-color: #1a1a1a;
     padding: 16px 0;
     border-radius: 16px;
 }
 
 pre code {
     font-family: monospace;
+    font-size: 1.05em;
     display: block;
     padding: 0 20px;
     color: #cecece;

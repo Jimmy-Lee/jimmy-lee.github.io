@@ -1,16 +1,14 @@
 * {
-    -webkit-box-sizing: border-box;
-    -moz-box-sizing: border-box;
     box-sizing: border-box;
 }
 
 body {
-    background: rgb(37, 39, 48);
-    color: #fff;
+    background: #111;
+    color: #ddd;
 }
 
 .sidebar {
-    margin: 2em 1em 0;
+    padding: 2em 1em 0;
 }
 
 .content {
@@ -18,16 +16,22 @@ body {
 }
 
 footer {
+    color: gray;
     text-align: center;
+    line-height: 0.3em;
+}
+
+footer > a {
+    color: gray;
 }
 
 article {
-    margin-bottom: 40pt;
+    margin-bottom: 54px;
 }
 
 .date {
     font-size: 0.9em;
-    color: lightgray;
+    color: gray;
 }
 
 .tag-list {
@@ -37,15 +41,14 @@ article {
 
 tag {
     display: inline-block;
-    background-color: #640000;
-    color: #ddd;
+    background-color: #a00;
     padding: 4px 6px;
     border-radius: 5px;
     margin-right: 5px;
 }
 
 a {
-    color: white;
+    color: #ddd;
 }
 
 tag > a {
@@ -60,6 +63,10 @@ a.theme:hover, a.theme:active {
     color: red;
 }
 
+article {
+    font-size: 1.05em;
+}
+
 article > p {
     line-height: 1.5;
 }
@@ -67,5 +74,9 @@ article > p {
 .icon {
     width: 1em;
     height: 1em;
-    margin-right: 4pt;
+    margin-right: 4px;
+}
+
+.contact {
+    margin: 8px 0;
 }

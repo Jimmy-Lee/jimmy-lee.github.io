@@ -116,6 +116,7 @@ extension JimmyLeeHTMLFactory {
             .h3(.text(site.description)),
             .forEach(site.contacts) { contact in
                 .div(
+                    .class("contact"),
                     .img(.class("icon"), .src(contact.icon)),
                     .span(.a(.href(contact.href), .text(contact.name)))
                 )
