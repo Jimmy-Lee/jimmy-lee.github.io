@@ -17,6 +17,7 @@ struct JimmyLee: Website {
     var description = "iOS Developer"
     var language: Language { .twi }
     var imagePath: Path? { nil }
+    let favicon: Favicon? = .init(path: "profile.jpg", type: "image/jpg")
 
     // Contact
     let contacts: [Contact] = [
