@@ -113,7 +113,7 @@ extension JimmyLeeHTMLFactory {
     func sideBar(_ site: JimmyLee) -> Node<HTML.BodyContext> {
         .div(
             .class("sidebar pure-u-1 pure-u-md-1-5"),
-            .img(.class("profile"), .src("profile.jpg")),
+            .img(.class("profile"), .src("/profile.jpg")),
             .h1(.a(.class("theme"), .href("/"), .text(site.name))),
             .h3(.text(site.description)),
             .forEach(site.contacts) { contact in
