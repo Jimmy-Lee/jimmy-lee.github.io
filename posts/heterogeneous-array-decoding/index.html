@@ -1,0 +1,153 @@
+<!DOCTYPE html><html lang="tw"><head><meta charset="UTF-8"/><meta name="og:site_name" content="李昇輯"/><link rel="canonical" href="http://localhost:8000/posts/heterogeneous-array-decoding"/><meta name="twitter:url" content="http://localhost:8000/posts/heterogeneous-array-decoding"/><meta name="og:url" content="http://localhost:8000/posts/heterogeneous-array-decoding"/><title>Heterogeneous Array Decoding (TW) | 李昇輯</title><meta name="twitter:title" content="Heterogeneous Array Decoding (TW) | 李昇輯"/><meta name="og:title" content="Heterogeneous Array Decoding (TW) | 李昇輯"/><meta name="description" content="Heterogeneous array decoding."/><meta name="twitter:description" content="Heterogeneous array decoding."/><meta name="og:description" content="Heterogeneous array decoding."/><meta name="twitter:card" content="summary"/><link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/base-min.css" type="text/css"/><link rel="stylesheet" href="https://unpkg.com/purecss@1.0.1/build/grids-responsive-min.css" type="text/css"/><link rel="stylesheet" href="/styles.css" type="text/css"/><link rel="stylesheet" href="/syntax.css" type="text/css"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><link rel="shortcut icon" href="/profile.jpg" type="image/jpg"/><link rel="alternate" href="/feed.rss" type="application/rss+xml" title="Subscribe to 李昇輯"/></head><body><div class="pure-g"><div class="sidebar pure-u-1 pure-u-md-1-5"><img class="profile" src="/profile.jpg"/><h1><a class="theme" href="/">李昇輯</a></h1><h3>iOS Developer</h3><div class="contact"><img class="icon" src="/map.png"/><span><a href="https://goo.gl/maps/P54AL2dvAHbti2aw5">Taipei, Taiwan</a></span></div><div class="contact"><img class="icon" src="/github.png"/><span><a href="https://github.com/Jimmy-Lee">Jimmy-Lee</a></span></div><div class="contact"><img class="icon" src="/linkedin.png"/><span><a href="https://www.linkedin.com/in/%E6%98%87%E8%BC%AF-%E6%9D%8E-8a5340112/">李昇輯</a></span></div><div class="contact"><img class="icon" src="/twitter.png"/><span><a href="https://twitter.com/jimmy_prime">@jimmy_prime</a></span></div><div class="contact"><img class="icon" src="/email.png"/><span><a href="mailto:jimmylevelup@gmail.com">jimmylevelup@gmail.com</a></span></div></div><div class="content pure-u-1 pure-u-md-3-5"><h1>Heterogeneous Array Decoding (TW)</h1><tag><a href="/tags/decodable">decodable</a></tag><tag><a href="/tags/generics">generics</a></tag><span class="date">2020-02-12</span><article><h2>Heterogeneous array 是什麼</h2><p>假設我們在做一個聊天軟體，有一支 api 會回傳所有 user，response 長這樣：</p><pre><code>{
+    <span class="string">"users"</span>: [
+        {
+            <span class="string">"id"</span>: <span class="number">1</span>,
+            <span class="string">"type"</span>: <span class="string">"human"</span>,
+            <span class="string">"name"</span>: <span class="string">"jimmylee"</span>,
+            <span class="string">"nickname"</span>: <span class="string">"升級"</span>
+        },
+        {
+            <span class="string">"id"</span>: <span class="number">2</span>,
+            <span class="string">"type"</span>: <span class="string">"bot"</span>,
+            <span class="string">"purpose"</span>: <span class="string">"git hook"</span>
+        }
+    ]
+}
+</code></pre><p>我們根據 response 建立 User model：</p><pre><code><span class="keyword">class</span> User: <span class="type">Decodable</span> {
+    <span class="keyword">let</span> id: <span class="type">Int</span>
+}
+
+<span class="keyword">class</span> Human: <span class="type">User</span> {
+    <span class="keyword">let</span> name: <span class="type">String</span>
+    <span class="keyword">let</span> nickname: <span class="type">String</span>
+
+    <span class="comment">// omit Decodable implementation for simplicity</span>
+}
+
+<span class="keyword">class</span> Bot: <span class="type">User</span> {
+    <span class="keyword">let</span> purpose: <span class="type">String</span>
+
+    <span class="comment">// omit Decodable implementation for simplicity</span>
+}
+</code></pre><p>我們的目標是把上面的 json decode 成 <code>[User]</code>，裡面應該有 <code>Human</code>, <code>Bot</code>, <code>User</code> instance。這個 <code>[User]</code> 就叫做 heterogeneous array。</p><h2>Decoding</h2><p>現在我們就來想一下要怎麼 decode，先寫一個簡單的做法：</p><pre><code><span class="keyword">protocol</span> Request {
+    <span class="keyword">associatedtype</span> Response
+}
+
+<span class="keyword">struct</span> UserListRequst: <span class="type">Request</span> {
+    <span class="keyword">typealias</span> Response = [<span class="type">User</span>]
+}
+
+<span class="keyword">func</span> send&lt;R: <span class="type">Request</span>&gt;(<span class="keyword">_</span> request: <span class="type">R</span>) -&gt; <span class="type">AnyPublisher</span>&lt;<span class="type">R</span>.<span class="type">Response</span>, <span class="type">Error</span>&gt; {
+    session.<span class="call">dataTaskPublisher</span>(for: <span class="call">buildURLRequest</span>(from: request))
+        .<span class="call">map</span> { $0.<span class="property">data</span> }
+        .<span class="call">decode</span>(type: <span class="type">R</span>.<span class="type">Response</span>.<span class="keyword">self</span>, decoder: <span class="type">JSONDecoder</span>())
+        .<span class="call">eraseToAnyPublisher</span>()
+}
+
+<span class="keyword">let</span> userListPublisher = <span class="call">send</span>(<span class="type">UserListRequst</span>())
+</code></pre><p>我們指定 <code>UserListRequest</code> 的 <code>Response</code> 是 <code>[User]</code>，compile 沒有問題，可惜的是這個做法結果是錯的，decode 出來的 <code>[User]</code> 所有 instance 都是 <code>User</code>，沒有 <code>Human</code> 或 <code>Bot</code>，這篇文章就是要處理這個問題。</p><p>在嘗試用程式解決問題之前，先想一下人類是怎麼 <em>decode</em> 的。我們知道 array 裡一個 object 會對應到一個 <code>User</code>，實際上是哪一個 subclass 要再進到 object 裡面，找到 key "type" 的 value，再回頭把整個 object decode 成對應的 <code>User</code>。</p><p>整理一下需要實作的東西：</p><ol><li>需要有 <code>string</code> -&gt; <code>User</code> 的對應表</li><li>要有方法可以先找到 type，再回頭 decode 整個 object</li></ol><p>這時候需要自己實作 <code>init(from decoder:)</code> 了。</p><pre><code><span class="keyword">struct</span> UserListRequest: <span class="type">Request</span> {
+    <span class="keyword">struct</span> Response: <span class="type">Decodable</span> {
+        <span class="keyword">let</span> list: [<span class="type">User</span>]
+    }
+
+    <span class="comment">// 1</span>
+    <span class="keyword">private enum</span> CodingKeys: <span class="type">String</span>, <span class="type">CodingKey</span> {
+        <span class="keyword">case</span> users
+        <span class="keyword">case</span> type
+    }
+
+    <span class="comment">// 2</span>
+    <span class="keyword">private enum</span> UserFamily: <span class="type">String</span>, <span class="type">Decodable</span> {
+        <span class="keyword">case</span> human
+        <span class="keyword">case</span> bot
+
+        <span class="keyword">var</span> type: <span class="type">User</span>.<span class="type">Type</span> {
+            <span class="keyword">switch self</span> {
+            <span class="keyword">case</span> .<span class="dotAccess">human</span>:
+                <span class="keyword">return</span> <span class="type">Human</span>.<span class="keyword">self
+            case</span> .<span class="dotAccess">bot</span>:
+                <span class="keyword">return</span> <span class="type">Bot</span>.<span class="keyword">self</span>
+            }
+        }
+    }
+
+    <span class="keyword">init</span>(from decoder: <span class="type">Decoder</span>) <span class="keyword">throws</span> { ... }
+}
+</code></pre><ol><li>先定義會用到的 CodingKey</li><li>定義一種 type safe 的方式把 <code>string</code> 轉成 <code>User</code></li></ol><p>接下來是 <code>init(from decoder: Decoder)</code> 裡面的實作</p><pre><code><span class="keyword">init</span>(from decoder: <span class="type">Decoder</span>) <span class="keyword">throws</span> {
+    <span class="keyword">let</span> container = <span class="keyword">try</span> decoder.<span class="call">container</span>(keyedBy: <span class="type">CodingKeys</span>.<span class="keyword">self</span>)
+    <span class="keyword">var</span> typeContainer = <span class="keyword">try</span> container.<span class="call">nestedUnkeyedContainer</span>(forKey: .<span class="dotAccess">users</span>)
+    <span class="keyword">var</span> list: [<span class="type">User</span>] = []
+
+    <span class="keyword">var</span> listContainer = typeContainer <span class="comment">// 1</span>
+    <span class="keyword">while</span> !listContainer.<span class="call">isAtEnd</span> {
+        <span class="keyword">let</span> user = <span class="keyword">try</span> typeContainer.<span class="call">nestedContainer</span>(keyedBy: <span class="type">CodingKeys</span>.<span class="keyword">self</span>)
+        <span class="keyword">if let</span> type = <span class="keyword">try</span>? user.<span class="call">decode</span>(<span class="type">UserFamily</span>.<span class="keyword">self</span>, forKey: .<span class="dotAccess">type</span>) {
+            list.<span class="call">append</span>(try listContainer.<span class="call">decode</span>(type.<span class="property">type</span>))
+        } <span class="keyword">else</span> {
+            list.<span class="call">append</span>(try listContainer.<span class="call">decode</span>(<span class="type">User</span>.<span class="keyword">self</span>))
+        }
+    }
+
+    <span class="keyword">self</span>.<span class="property">list</span> = list
+}
+</code></pre><ol><li>這裡為什麼要這樣寫，就我的理解是因為 <code>decoder</code> 很像 file pointer，只能一直往前。所以需要一個進去找到 type，一個留在 object 的起點。</li></ol><h2>Improvements</h2><p>OK，到這邊其實就完成了，但這個實作有一些缺點：</p><ol><li>每個 response 的 key 不同，也可能沒有 key</li><li>每個 response 的 type family 不同</li><li>init(from: Decoder) 每次都要重寫</li></ol><h3>TypeKey</h3><p>在 response 裡面，這個 instance 是什麼 type 的 key。目前所有用途都用 “type”，所以直接定義一個 global enum，未來有型別不使用 “type” 可以再修改。</p><pre><code><span class="keyword">enum</span> TypeKey: <span class="type">CodingKey</span> {
+    <span class="keyword">case</span> type
+}
+</code></pre><h3>TypeFamily</h3><p>把 <code>string</code> 轉成 <code>type</code> 這部分變成介面。</p><pre><code><span class="keyword">protocol</span> TypeFamily: <span class="type">Decodable</span> {
+    <span class="keyword">associatedtype</span> Member: <span class="type">Decodable</span>
+    <span class="keyword">var</span> type: <span class="type">Member</span>.<span class="type">Type</span> { <span class="keyword">get</span> }
+}
+</code></pre><p>原本 <code>UserFamily</code> 實作 Decodable，改成 <code>TypeFamily</code> 就可以了。</p><pre><code><span class="keyword">private enum</span> UserFamily: <span class="type">String</span>, <span class="type">TypeFamily</span> {
+    <span class="keyword">case</span> human
+    <span class="keyword">case</span> bot
+
+    <span class="keyword">var</span> type: <span class="type">User</span>.<span class="type">Type</span> {
+        <span class="keyword">switch self</span> {
+        <span class="keyword">case</span> .<span class="dotAccess">human</span>:
+            <span class="keyword">return</span> <span class="type">Human</span>.<span class="keyword">self
+        case</span> .<span class="dotAccess">bot</span>:
+            <span class="keyword">return</span> <span class="type">Bot</span>.<span class="keyword">self</span>
+        }
+    }
+}
+</code></pre><h3>KeyedListKey</h3><p>Response array 外面可能還有一層 key</p><pre><code># keyed <span class="call">response</span>
+{
+    <span class="string">"user"</span>: []
+}
+
+# unkeyed response
+[]
+</code></pre><p>我們定義一下 Keyed 的介面</p><pre><code><span class="keyword">protocol</span> KeyedListKey: <span class="type">CodingKey</span> {
+    <span class="keyword">static var</span> key: <span class="type">Self</span> { <span class="keyword">get</span> }
+}
+
+<span class="keyword">enum</span> UserListKey: <span class="type">KeyedListKey</span> {
+    <span class="keyword">case</span> users
+    
+    <span class="keyword">static let</span> key = <span class="type">Self</span>.<span class="property">users</span>
+}
+</code></pre><h3>組裝在一起</h3><p>有了 TypeKey, TypeFamily, KeyedListKey 之後，我們可以把 <code>init(from decoder: Decoder)</code> 裡面的東西全部拆出來。</p><pre><code><span class="keyword">struct</span> KeyedHeterogeneousList&lt;Family: <span class="type">TypeFamily</span>, Key: <span class="type">KeyedListKey</span>&gt;: <span class="type">Decodable</span> {
+    <span class="keyword">let</span> list: [<span class="type">Family</span>.<span class="type">Member</span>]
+
+    <span class="keyword">init</span>(from decoder: <span class="type">Decoder</span>) <span class="keyword">throws</span> {
+        <span class="keyword">let</span> container = <span class="keyword">try</span> decoder.<span class="call">container</span>(keyedBy: <span class="type">Key</span>.<span class="keyword">self</span>)
+        <span class="keyword">var</span> typeContainer = <span class="keyword">try</span> container.<span class="call">nestedUnkeyedContainer</span>(forKey: <span class="type">Key</span>.<span class="property">key</span>)
+        <span class="keyword">var</span> list: [<span class="type">Family</span>.<span class="type">Member</span>] = []
+
+        <span class="keyword">var</span> listContainer = typeContainer
+        <span class="keyword">while</span> !listContainer.<span class="call">isAtEnd</span> {
+            <span class="keyword">let</span> instance = <span class="keyword">try</span> typeContainer.<span class="call">nestedContainer</span>(keyedBy: <span class="type">TypeKey</span>.<span class="keyword">self</span>)
+            <span class="keyword">if let</span> type = <span class="keyword">try</span>? instance.<span class="call">decode</span>(<span class="type">Family</span>.<span class="keyword">self</span>, forKey: .<span class="dotAccess">type</span>) {
+                list.<span class="call">append</span>(try listContainer.<span class="call">decode</span>(type.<span class="property">type</span>))
+            } <span class="keyword">else</span> {
+                list.<span class="call">append</span>(try listContainer.<span class="call">decode</span>(<span class="type">Family</span>.<span class="type">Member</span>.<span class="keyword">self</span>))
+            }
+        }
+
+        <span class="keyword">self</span>.<span class="property">list</span> = list
+    }
+}
+</code></pre><p>和原本 <code>UserListRequest</code> 裡面實作的結構一樣，只是用 generic 帶換掉和 <code>User</code> 綁在一起的部分。有了 <code>KeyedHeterogeneousList</code> 之後，可以把 <code>UserListRequest</code> 改寫成：</p><pre><code><span class="keyword">struct</span> UserListRequest: <span class="type">Request</span> {
+    <span class="keyword">typealias</span> Response: <span class="type">KeyedHeterogeneousList</span>&lt;<span class="type">UserFamily</span>, <span class="type">UserListKey</span>&gt;
+}
+</code></pre><h2>Reference</h2><p>一開始的想法是從<a href="https://medium.com/@kewindannerfjordremeczki/swift-4-0-decodable-heterogeneous-collections-ecc0e6b468cf">這篇文章</a>來的，這裡提供了怎麼先拿到 type 再 decode 整個 object 的方法。我基於這裡的 code 再用 generic 改進。</p><p>完整的 code 可以參考我的 <a href="https://gist.github.com/Jimmy-Lee/c66a613403f912d35c2d226ff1b9c16f">gist</a>，裡面有完整的 Keyed, Unkeyed 版本和 unit test。</p></article></div><footer><p>Generated using <a href="https://github.com/johnsundell/publish">Publish</a></p><p><a href="/feed.rss">RSS feed</a></p></footer></div></body></html>
